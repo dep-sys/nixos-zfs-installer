@@ -43,10 +43,6 @@ zfs create -p -o mountpoint=legacy rpool/safe/persist
 mkdir /mnt/persist
 mount -t zfs rpool/safe/persist /mnt/persist
 
-# TODO adapt networking.hostID and others in a new ./machines/$hosts/default.nix and
-#head -c 8 /etc/machine-id
-nixos-generate-config --root /mnt
-
 # TODO copy flake
 nixos-install \
     --no-channel-copy \

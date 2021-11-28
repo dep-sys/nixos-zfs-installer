@@ -6,10 +6,6 @@
 
   outputs = { self, nixpkgs }@inputs:
     let
-
-      # Generate a user-friendly version number.
-      version = builtins.substring 0 8 self.lastModifiedDate;
-
       # System types to support.
       system = "x86_64-linux";
 
@@ -20,6 +16,11 @@
         "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDLopgIL2JS/XtosC8K+qQ1ZwkOe1gFi8w2i1cd13UehWwkxeguU6r26VpcGn8gfh6lVbxf22Z9T2Le8loYAhxANaPghvAOqYQH/PJPRztdimhkj2h7SNjP1/cuwlQYuxr/zEy43j0kK0flieKWirzQwH4kNXWrscHgerHOMVuQtTJ4Ryq4GIIxSg17VVTA89tcywGCL+3Nk4URe5x92fb8T2ZEk8T9p1eSUL+E72m7W7vjExpx1PLHgfSUYIkSGBr8bSWf3O1PW6EuOgwBGidOME4Y7xNgWxSB/vgyHx3/3q5ThH0b8Gb3qsWdN22ZILRAeui2VhtdUZeuf2JYYh8L phaer-yubikey"
       ];
 
+      # disk to NUKE EVERYTHING on, before installing Nixos
+      bootDisk = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0";
+      # unique host identifier. Should be dynamic, e.g. /etc/machine-id contents.
+      # how to nixos-install flake with runtime parameter?
+      hostId = "12345678";
     in
 
     {
@@ -88,7 +89,8 @@
             };
 
           fileSystems."/boot" =
-            { # device = "/dev/disk/by-uuid/722A-9958";
+            {
+              device = bootDisk;
               fsType = "vfat";
             };
 
@@ -138,7 +140,9 @@
               modules = with self.nixosModules; [
                 ssh
                 zfs
+                hetzner
                 ({ pkgs, lib, ... }: {
+                  networking.hostId = hostId;
                   nixpkgs.overlays = [ self.overlay ];
                   i18n.defaultLocale = "en_US.UTF-8";
                   time.timeZone = "UTC";
