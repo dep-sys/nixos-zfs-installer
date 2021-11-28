@@ -4,13 +4,22 @@
 set -euxo pipefail
 
 export DISK=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0
+export EFI=false
 
 # delete existing partitions
 sgdisk -Z $DISK
-# part3: /boot
+
+# part2: boot partition, needed for legacy (BIOS) boot.
+sgdisk -a1 -n2:34:2047 -t2:EF02 $DISK
+
+# part3: efi boot
 sgdisk -n3:1M:+512M -t3:EF00 $DISK
+
 # part1: zfs
 sgdisk -n1:0:0 -t1:BF01 $DISK
+
+# reload partition table
+partprobe
 
 zpool create \
 	-o ashift=12 \
@@ -46,5 +55,6 @@ mount -t zfs rpool/safe/persist /mnt/persist
 # TODO copy flake
 nixos-install \
     --no-channel-copy \
-    --no-root-password \
+    --root /mnt \
+    --no-root-passwd \
     --flake .#base

@@ -17,7 +17,7 @@
       ];
 
       # disk to NUKE EVERYTHING on, before installing Nixos
-      bootDisk = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0";
+      diskToFormat = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0";
       # unique host identifier. Should be dynamic, e.g. /etc/machine-id contents.
       # how to nixos-install flake with runtime parameter?
       hostId = "12345678";
@@ -77,11 +77,11 @@
         zfs = { pkgs, lib, ... }: {
           boot.loader.grub.enable = true;
           boot.loader.grub.version = 2;
-          boot.loader.grub.efiSupport = true;
-          boot.loader.grub.devices = [ "nodev" ];
+          boot.loader.grub.efiSupport = false;
+          boot.loader.efi.canTouchEfiVariables = false;
+          boot.loader.grub.devices = [ "${diskToFormat}" ];
           boot.supportedFilesystems = [ "zfs" ];
           # TODO is somewhat dangerous, check if needed
-          boot.loader.efi.canTouchEfiVariables = true;
 
           fileSystems."/" =
             { device = "rpool/local/root";
@@ -90,7 +90,7 @@
 
           fileSystems."/boot" =
             {
-              device = bootDisk;
+              device = "${diskToFormat}-part3";
               fsType = "vfat";
             };
 
@@ -111,6 +111,10 @@
           swapDevices = [ ];
         };
 
+        hetzner =
+          { pkgs, lib, ... }:
+          {
+         };
 
         installationEnvironment =
           { pkgs, lib, ... }:
@@ -151,6 +155,10 @@
                     usePredictableInterfaceNames = true;
                     useDHCP = true;
                   };
+
+                  environment.systemPackages = [
+                    pkgs.git  # needed for nix flakes
+                  ];
                 })
               ];
             };
