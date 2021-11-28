@@ -46,6 +46,24 @@
 
       # A NixOS module, if applicable (e.g. if the package provides a system service).
       nixosModules = {
+        nix = { pkgs, lib, ... }: {
+          nix = {
+            nixPath = [ "nixpkgs=${nixpkgs}" ];
+            # Let 'nixos-version --json' know the Git revision of this flake.
+            registry.nixpkgs.flake = nixpkgs;
+            registry.installer.flake = self;
+
+            package = pkgs.nixUnstable;
+            extraOptions = "experimental-features = nix-command flakes";
+            gc = {
+              automatic = true;
+              options = "--delete-older-than 30d";
+            };
+            optimise.automatic = true;
+          };
+        };
+
+
         ssh = { pkgs, lib, ... }: {
           users.users.root.openssh.authorizedKeys.keys = rootSSHKeys;
           services.openssh = {
@@ -56,44 +74,82 @@
         };
 
         zfs = { pkgs, lib, ... }: {
+          boot.loader.grub.enable = true;
+          boot.loader.grub.version = 2;
+          boot.loader.grub.efiSupport = true;
+          boot.loader.grub.devices = [ "nodev" ];
+          boot.supportedFilesystems = [ "zfs" ];
+          # TODO is somewhat dangerous, check if needed
+          boot.loader.efi.canTouchEfiVariables = true;
 
+          fileSystems."/" =
+            { device = "rpool/local/root";
+              fsType = "zfs";
+            };
+
+          fileSystems."/boot" =
+            { # device = "/dev/disk/by-uuid/722A-9958";
+              fsType = "vfat";
+            };
+
+          fileSystems."/nix" =
+            { device = "rpool/local/nix";
+              fsType = "zfs";
+            };
+
+          fileSystems."/home" =
+            { device = "rpool/safe/home";
+              fsType = "zfs";
+            };
+
+          fileSystems."/persist" =
+            { device = "rpool/safe/persist";
+              fsType = "zfs";
+            };
+          swapDevices = [ ];
         };
+
 
         installationEnvironment =
           { pkgs, lib, ... }:
           {
             imports = with self.nixosModules; [
               ssh
-              zfs
+              nix
             ];
 
-            #nixpkgs.overlays = [ self.overlay ];
-
-            #i18n.defaultLocale = "en_US.UTF-8";
-            #time.timeZone = "UTC";
-
-            #environment.systemPackages = [ pkgs.vim ];
-
-            networking = {
+           networking = {
               firewall.allowedTCPPorts = [ 22 ];
               usePredictableInterfaceNames = true;
               useDHCP = true;
             };
 
-            #nix = {
-            #  nixPath = [ "nixpkgs=${nixpkgs}" ];
-            #  # Let 'nixos-version --json' know the Git revision of this flake.
-            #  registry.nixpkgs.flake = nixpkgs;
+            environment.systemPackages = [
+              # TODO: temporary
+              (pkgs.writeScriptBin "nuke-disks" (builtins.readFile ./pkgs/nuke-disk.sh))
+            ];
 
-            #  package = pkgs.nixUnstable;
-            #  extraOptions = "experimental-features = nix-command flakes";
-            #  gc = {
-            #    automatic = true;
-            #    options = "--delete-older-than 30d";
-            #  };
-            #  optimise.automatic = true;
-            #};
-          };
+         };
+      };
+
+      nixosConfigurations = {
+        base = nixpkgs.lib.nixosSystem {
+              inherit system;
+              modules = with self.nixosModules; [
+                ssh
+                zfs
+                ({ pkgs, lib, ... }: {
+                  nixpkgs.overlays = [ self.overlay ];
+                  i18n.defaultLocale = "en_US.UTF-8";
+                  time.timeZone = "UTC";
+                  networking = {
+                    firewall.allowedTCPPorts = [ 22 ];
+                    usePredictableInterfaceNames = true;
+                    useDHCP = true;
+                  };
+                })
+              ];
+            };
       };
 
       # # Tests run by 'nix flake check' and by Hydra.

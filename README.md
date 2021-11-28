@@ -23,7 +23,9 @@ It's a [Nix Flake]() which uses [NixPkgs stable]()
 ## Secrets 
  
 
-# Quick notes regarding installer tests
+# Roadmap
+
+## [x] Get the server to boot with kexec
 
 ``` sh
 
@@ -37,25 +39,32 @@ IPv4: 116.203.101.184
 # rsync -Lvz --info=progress2 result/* 116.203.101.184:
 [ Uploading almost 1GB can take a while, but we end up with a pretty much fully functional environment]
 
+# "Boot" into the installation environment using kexec (this might take a few minutes)
+ssh root@116.203.101.184 bash kexec-installer
+
 ```
 
-Grub entry
+### Debugging with grub
+
+During development, it can be useful to boot the generated kernel and initrd manually via grub. I use hetzners web console
+to get to the bootloader, press `c` for a console and paste the following lines:
+
+Make sure to replace the init hash from kexec-installer (or try to remove it, and if it does, delete this notice)
 
 ``` sh
-setparams "NixOS"
-    load_video
     insmod gzio
     insmod part_gpt
     insmod ext2
     set root='hd0,gpt1'
-    echo 'loading kernel'
     linux /root/bzImage init=/nix/store/sqh8cmi552m0spg4g2q505nif7vy5g3p-nixos-system-nixos-21.05pre-git/init loglevel=4
-    #consoleblank=-1 systemd.show_status=true console=tty1 console=ttyS0
-    echo 'loading initrd'
     initrd /root/initrd.gz 
     boot
     
 ```
+
+### Install NiXOS
+
+TODO: current experiments in nuke-disk.sh
 
 # References
 * [Github: Mic92s kexec-installer.nix](https://gist.github.com/Mic92/4fdf9a55131a7452f97003f445294f97)
