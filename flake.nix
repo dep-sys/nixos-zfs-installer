@@ -25,33 +25,6 @@ AAAEDROyjqG0s5Gh/nIovEI8P0qZwDgdmtBtdj6CBZld36bthlqjfZbfZ0M8UWYnY3lMi/
 QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
 -----END OPENSSH PRIVATE KEY-----
      '';
-
-      # disk to NUKE EVERYTHING on, before installing Nixos
-      diskToFormat = "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0";
-
-      hostName = "test-installation";
-      # unique host identifier. Should be dynamic, e.g. /etc/machine-id contents.
-      # how to nixos-install flake with runtime parameter?
-      hostId = "12345678";
-
-      # See <https://major.io/2015/08/21/understanding-systemds-predictable-network-device-names/#picking-the-final-name>
-      # for a description on how to find out the network card name reliably.
-      networkInterface = "ens3";
-      # This was derived from `sudo lshw -C network`, for me it says `driver=igb`.
-      # Needed to load the right driver before boot for the initrd SSH session.
-      networkInterfaceModule = "virtio-pci";
-      # From the Hetzner control panel
-      ipv4 = {
-        address = "116.203.101.184"; # the ip address
-        gateway = "172.31.1.1"; # the gateway ip address
-        netmask = "255.255.255.255";
-        prefixLength = 32;
-      };
-      ipv6 = {
-        address = "2a01:4f8:c2c:c058::1"; # the ipv6 addres
-        gateway = "fe80::1"; # the ipv6 gateway
-        prefixLength = 64; # shown in the control panel
-      };
     in
 
     {
@@ -105,11 +78,11 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
           };
         };
 
-        zfs = { pkgs, lib, ... }: {
+        zfs = { pkgs, lib, runtimeInfo, ... }: {
           boot.loader.grub.enable = true;
           boot.loader.grub.version = 2;
           boot.loader.grub.efiSupport = false;
-          boot.loader.grub.devices = [ diskToFormat ];
+          boot.loader.grub.devices = [ runtimeInfo.diskToFormat ];
           boot.supportedFilesystems = [ "zfs" ];
           boot.zfs.requestEncryptionCredentials = true;
           boot.zfs.devNodes = "/dev/disk/by-partuuid";
@@ -151,7 +124,7 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
 
           fileSystems."/boot" =
             {
-              device = "${diskToFormat}-part3";
+              device = "${runtimeInfo.diskToFormat}-part3";
               fsType = "vfat";
             };
 
@@ -173,28 +146,30 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
         };
 
         hetzner =
-          { pkgs, lib, modulesPath, ... }:
+          { pkgs, lib, modulesPath, runtimeInfo, ... }:
           {
             imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
 
             boot.initrd.availableKernelModules = [ "virtio_net" "ata_piix" "virtio_pci" "virtio_scsi" "xhci_pci" "sd_mod" "sr_mod" ];
-            boot.kernelParams = [
+            boot.kernelParams = with runtimeInfo; [
               # See <https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt> for docs on this
               # ip=<client-ip>:<server-ip>:<gw-ip>:<netmask>:<hostname>:<device>:<autoconf>:<dns0-ip>:<dns1-ip>:<ntp0-ip>
               # The server ip refers to the NFS server -- we don't need it.
               "ip=${ipv4.address}::${ipv4.gateway}::${hostName}-initrd:${networkInterface}:off:8.8.8.8"
             ];
 
-            networking.hostName = hostName;
-            networking.useDHCP = false;
-            networking.interfaces.${networkInterface} = {
+            networking = with runtimeInfo; {
+              hostName = hostName;
               useDHCP = false;
-              ipv4 = { addresses = [{ address = ipv4.address; prefixLength = ipv4.prefixLength; }]; };
-              ipv6 = { addresses = [{ address = ipv6.address; prefixLength = ipv6.prefixLength; }]; };
+              interfaces.${networkInterface} = {
+                useDHCP = false;
+                ipv4 = { addresses = [{ address = ipv4.address; prefixLength = ipv4.prefixLength; }]; };
+                ipv6 = { addresses = [{ address = ipv6.address; prefixLength = ipv6.prefixLength; }]; };
+              };
+              defaultGateway = ipv4.gateway;
+              defaultGateway6 = { address = ipv6.gateway; interface = networkInterface; };
+              nameservers = [ "8.8.8.8" ];
             };
-            networking.defaultGateway = ipv4.gateway;
-            networking.defaultGateway6 = { address = ipv6.gateway; interface = networkInterface; };
-            networking.nameservers = [ "8.8.8.8" ];
           };
 
         installationEnvironment =
@@ -214,14 +189,22 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
            environment.systemPackages = [
              pkgs.jq
              pkgs.ethtool
-              (let
-                nukeDisk = (pkgs.writeScript "nuke-disk" (builtins.readFile ./pkgs/nuke-disk.sh));
+             (let
+               readRuntimeInfoScript = pkgs.writeScript "read-runtime-info" ''
+                 set -euo pipefail
+                 cat /proc/cmdline \
+                 | awk -v RS=" " '/^runtime_info/ {print gensub(/runtime_info="(.+)"/, "\\1", "g", $0);}' \
+                 | base64 -d
+                 '';
+                nukeDiskScript = pkgs.writeScript "nuke-disk" (builtins.readFile ./pkgs/nuke-disk.sh);
               in
               (pkgs.writeScriptBin "install-flake" ''
               #!/usr/bin/env bash
               set -euxo pipefail
 
-              ${nukeDisk} "${diskToFormat}"
+              ${readRuntimeInfoScript} > runtime-info.json
+
+              ${nukeDiskScript} "$( jq -r .diskToFormat runtime-info.json)"
 
               TMPDIR=/tmp nixos-install \
               --no-channel-copy \
