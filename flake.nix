@@ -182,7 +182,7 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
               # See <https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt> for docs on this
               # ip=<client-ip>:<server-ip>:<gw-ip>:<netmask>:<hostname>:<device>:<autoconf>:<dns0-ip>:<dns1-ip>:<ntp0-ip>
               # The server ip refers to the NFS server -- we don't need it.
-              "ip=${ipv4.address}::${ipv4.gateway}:${ipv4.netmask}:${hostName}-initrd:${networkInterface}:off:8.8.8.8"
+              "ip=${ipv4.address}::${ipv4.gateway}::${hostName}-initrd:${networkInterface}:off:8.8.8.8"
             ];
 
             networking.hostName = hostName;
@@ -211,7 +211,9 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
               useDHCP = true;
             };
 
-            environment.systemPackages = [
+           environment.systemPackages = [
+             pkgs.jq
+             pkgs.ethtool
               (let
                 nukeDisk = (pkgs.writeScript "nuke-disk" (builtins.readFile ./pkgs/nuke-disk.sh));
               in
@@ -219,9 +221,7 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
               #!/usr/bin/env bash
               set -euxo pipefail
 
-              KEYFILE=$(mktemp)
-              echo "testtest" > $KEYFILE
-              ${nukeDisk} "${diskToFormat}" "$KEYFILE"
+              ${nukeDisk} "${diskToFormat}"
 
               TMPDIR=/tmp nixos-install \
               --no-channel-copy \

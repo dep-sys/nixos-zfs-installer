@@ -4,19 +4,18 @@
 set -euxo pipefail
 
 export DISK="$1"
-export KEYFILE="$2"
 
 # delete existing partitions
-sgdisk -Z $DISK
+sgdisk -Z "$DISK"
 
 # part2: boot partition, needed for legacy (BIOS) boot.
-sgdisk -a1 -n2:34:2047 -t2:EF02 $DISK
+sgdisk -a1 -n2:34:2047 -t2:EF02 "$DISK"
 
 # part3: efi boot
-sgdisk -a1 -n3:1M:+512M -t3:EF00 $DISK
+sgdisk -a1 -n3:1M:+512M -t3:EF00 "$DISK"
 
 # part1: zfs
-sgdisk -a1 -n1:0:0 -t1:BF01 $DISK
+sgdisk -a1 -n1:0:0 -t1:BF01 "$DISK"
 
 # reload partition table
 partprobe
