@@ -3,8 +3,8 @@
 
 set -euxo pipefail
 
-export DISK=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0-0-0-0
-export EFI=false
+export DISK="$1"
+export KEYFILE="$2"
 
 # delete existing partitions
 sgdisk -Z $DISK
@@ -13,16 +13,18 @@ sgdisk -Z $DISK
 sgdisk -a1 -n2:34:2047 -t2:EF02 $DISK
 
 # part3: efi boot
-sgdisk -n3:1M:+512M -t3:EF00 $DISK
+sgdisk -a1 -n3:1M:+512M -t3:EF00 $DISK
 
 # part1: zfs
-sgdisk -n1:0:0 -t1:BF01 $DISK
+sgdisk -a1 -n1:0:0 -t1:BF01 $DISK
 
 # reload partition table
 partprobe
 
+#	-O keylocation="file://$KEYFILE" \
 zpool create \
 	-o ashift=12 \
+	-o altroot="/mnt" \
 	-O mountpoint=legacy \
 	-O atime=off \
 	-O acltype=posixacl \
@@ -30,15 +32,15 @@ zpool create \
 	-O compression=on \
 	-O encryption=on \
 	-O keyformat=passphrase \
-	rpool $DISK-part1
+	rpool "$DISK-part1"
 
 zfs create -p -o mountpoint=legacy rpool/local/root
 zfs snapshot rpool/local/root@blank
 mount -t zfs rpool/local/root /mnt
 
-mkfs.vfat $DISK-part3
+mkfs.vfat "$DISK-part3"
 mkdir /mnt/boot
-mount $DISK-part3 /mnt/boot
+mount "$DISK-part3" /mnt/boot
 
 zfs create -p -o mountpoint=legacy rpool/local/nix
 mkdir /mnt/nix
@@ -52,9 +54,3 @@ zfs create -p -o mountpoint=legacy rpool/safe/persist
 mkdir /mnt/persist
 mount -t zfs rpool/safe/persist /mnt/persist
 
-# TODO copy flake
-nixos-install \
-    --no-channel-copy \
-    --root /mnt \
-    --no-root-passwd \
-    --flake .#base

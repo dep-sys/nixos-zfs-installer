@@ -18,7 +18,6 @@ It's a [Nix Flake]() which uses [NixPkgs stable]()
 
 ## Colmena 
 
-## Secrets
 
 ## Secrets 
  
@@ -28,19 +27,14 @@ It's a [Nix Flake]() which uses [NixPkgs stable]()
 ## [x] Get the server to boot with kexec
 
 ``` sh
+nix build .#kexec
+hcloud server create --name installer-test --type cx21 --image debian-11 --location nbg1 --ssh-key "phaers yubikey"
 
-# hcloud server create --name installer-test --type cx21 --image debian-11 --location nbg1 --ssh-key "phaers yubikey"
-[=====================================] 100.00%
-Waiting for server 16336486 to have started
- ... done                                                                                                                                                                                      
-Server 16336486 created
-IPv4: 116.203.101.184
-
-# rsync -Lvz --info=progress2 result/* 116.203.101.184:
-[ Uploading almost 1GB can take a while, but we end up with a pretty much fully functional environment]
-
+export TARGET_SERVER=$(hcloud server ip installer-test)
+rsync -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" -Lvz --info=progress2 result/* root@$TARGET_SERVER:
+# [ Uploading almost 1GB can take a while, but we end up with a pretty much fully functional environment]
 # "Boot" into the installation environment using kexec (this might take a few minutes)
-ssh root@116.203.101.184 bash kexec-installer
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$TARGET_SERVER "apt update && DEBIAN_FRONTEND=noninteractive apt install -y kexec-tools && bash kexec-installer"
 
 ```
 
@@ -64,7 +58,12 @@ Make sure to replace the init hash from kexec-installer (or try to remove it, an
 
 ### Install NiXOS
 
-TODO: current experiments in nuke-disk.sh
+``` sh
+# TODO interactive zpool key
+ssh -t -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$TARGET_SERVER install-flake
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$TARGET_SERVER reboot
+```
+
 
 # References
 * [Github: Mic92s kexec-installer.nix](https://gist.github.com/Mic92/4fdf9a55131a7452f97003f445294f97)
