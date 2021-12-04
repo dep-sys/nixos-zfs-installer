@@ -53,13 +53,13 @@ jq --null-input \
   "networkInterfaceModule": $networkInterfaceModule,
   "ipv4": {
     "address": $ipv4Address,
-    "prefixLength": $ipv4PrefixLength,
+    "prefixLength": $ipv4PrefixLength | tonumber,
     "gateway": $ipv4Gateway,
     "netmask": $ipv4Netmask
   },
   "ipv6": {
     "address": $ipv6Address,
-    "prefixLength": $ipv6PrefixLength,
+    "prefixLength": $ipv6PrefixLength | tonumber,
     "gateway": $ipv6Gateway
   }
 }'
