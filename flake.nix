@@ -232,7 +232,7 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
                   inputs.installer.url = "${self.outPath}";
                   outputs = { self, installer }:
                   let runtimeInfo = builtins.fromJSON(builtins.readFile(./runtime-info.json));
-                  in { nixosConfigurations.install = installer.lib.makeSystem runtimeInfo; };
+                  in { nixosConfigurations.install = installer.lib.makeSystem self runtimeInfo; };
               }
               EOF
 
@@ -251,16 +251,19 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
          };
       };
 
-      lib.makeSystem = runtimeInfo:
+      lib.makeSystem = flake: runtimeInfo:
         nixpkgs.lib.nixosSystem {
           inherit system;
-          extraArgs.runtimeInfo = runtimeInfo;
+          extraArgs.runtimeInfo = builtins.trace runtimeInfo runtimeInfo;
           modules = with self.nixosModules; [
             core
             ssh
             nix
             zfs
             hetzner
+            ({ pkgs, lib, ... }: {
+              nix.registry.installed.flake = flake;
+            })
           ];
         };
 
