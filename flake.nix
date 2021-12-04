@@ -258,6 +258,7 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
           modules = with self.nixosModules; [
             core
             ssh
+            nix
             zfs
             hetzner
           ];
