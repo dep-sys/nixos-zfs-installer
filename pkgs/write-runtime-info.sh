@@ -21,19 +21,19 @@ _IP_ADDR_INFO="$(ip --json addr show | jq '.[] | select(.link_type != "loopback"
 # Hetzner clouds debian uses old style network interface names, we need to convert
 # e.g. eth0 -> enp0s3
 _NETWORK_INTERFACE_OLD_STYLE="$(echo "$_IP_ADDR_INFO" | jq -r .ifname)"
-NETWORK_INTERFACE="$(udevadm info --export --query=property --path="/sys/class/net/$_NETWORK_INTERFACE_OLD_STYLE" | awk "/^ID_NET_NAME_PATH/ {print gensub(/ID_NET_NAME_PATH='(.+)'/, \"\\\\1\", \"g\", \$0);}")";
-NETWORK_INTERFACE_MODULE="$(ethtool -i "$NETWORK_INTERFACE" | awk '/driver:/ {print $2}')"
+NETWORK_INTERFACE="$(udevadm info --export --query=property --path="/sys/class/net/$_NETWORK_INTERFACE_OLD_STYLE" | gawk "/^ID_NET_NAME_PATH/ {print gensub(/ID_NET_NAME_PATH='(.+)'/, \"\\\\1\", \"g\", \$0);}")";
+NETWORK_INTERFACE_MODULE="$(ethtool -i "$NETWORK_INTERFACE" | gawk '/driver:/ {print $2}')"
 
 _IPV4_INFO="$(echo "$_IP_ADDR_INFO" | jq '.addr_info[] | select(.scope == "global" and .family == "inet")')"
 IPV4_ADDRESS="$(echo "$_IPV4_INFO" | jq -r '.local')"
 IPV4_PREFIX_LENGTH="$(echo "$_IPV4_INFO" | jq -r '.prefixlen')"
 IPV4_NETMASK="255.255.255.255"  # TODO, dont hardcode
-IPV4_GATEWAY="$(ip route | awk '/default via/ {print $3}')"
+IPV4_GATEWAY="$(ip route | gawk '/default via/ {print $3}')"
 
 _IPV6_INFO="$(echo "$_IP_ADDR_INFO" | jq '.addr_info[] | select(.scope == "global" and .family == "inet6")')"
 IPV6_ADDRESS="$(echo "$_IPV6_INFO" | jq -r '.local')"
 IPV6_PREFIX_LENGTH="$(echo "$_IPV6_INFO" | jq -r '.prefixlen')"
-IPV6_GATEWAY="$(ip -6 route | awk '/default via/ {print $3}')"
+IPV6_GATEWAY="$(ip -6 route | gawk '/default via/ {print $3}')"
 
 jq --null-input \
   --arg hostName "$HOST_NAME" \

@@ -21,8 +21,9 @@ let
     command -v kexec || TO_INSTALL="kexec-tools $TO_INSTALL"
     command -v jq || TO_INSTALL="jq $TO_INSTALL"
     command -v ethtool || TO_INSTALL="ethtool $TO_INSTALL"
+    command -v gawk || TO_INSTALL="gawk $TO_INSTALL"
 
-    test -n "$TO_INSTALL" && apt update -y && apt install -y $TO_INSTALL
+    test -n "$TO_INSTALL" && apt update -y && DEBIAN_FRONTEND=noninteractive apt install -y $TO_INSTALL
 
     ./write-runtime-info > runtime-info.json
 
