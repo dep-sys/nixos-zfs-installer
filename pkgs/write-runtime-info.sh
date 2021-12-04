@@ -24,6 +24,7 @@ NETWORK_INTERFACE_MODULE="$(ethtool -i "$NETWORK_INTERFACE" | awk '/driver:/ {pr
 _IPV4_INFO="$(echo "$_IP_ADDR_INFO" | jq '.addr_info[] | select(.scope == "global" and .family == "inet")')"
 IPV4_ADDRESS="$(echo "$_IPV4_INFO" | jq -r '.local')"
 IPV4_PREFIX_LENGTH="$(echo "$_IPV4_INFO" | jq -r '.prefixlen')"
+IPV4_NETMASK="255.255.255.255"  # TODO, dont hardcode
 IPV4_GATEWAY="$(ip route | awk '/default via/ {print $3}')"
 
 _IPV6_INFO="$(echo "$_IP_ADDR_INFO" | jq '.addr_info[] | select(.scope == "global" and .family == "inet6")')"
@@ -43,8 +44,8 @@ jq --null-input \
   --arg ipv6Address "$IPV6_ADDRESS" \
   --arg ipv6PrefixLength "$IPV6_PREFIX_LENGTH" \
   --arg ipv6Gateway "$IPV6_GATEWAY" \
-  '
-{
+  --arg ipv4Netmask "$IPV4_NETMASK" \
+'{
   "hostName": $hostName,
   "hostId": $hostId,
   "diskToFormat": $diskToFormat,
@@ -54,12 +55,11 @@ jq --null-input \
     "address": $ipv4Address,
     "prefixLength": $ipv4PrefixLength,
     "gateway": $ipv4Gateway,
-    "netmask": "255.255.255.255",  # TODO, dont hardcode
+    "netmask": $ipv4Netmask
   },
   "ipv6": {
     "address": $ipv6Address,
     "prefixLength": $ipv6PrefixLength,
-    "gateway": $ipv6Gateway,
+    "gateway": $ipv6Gateway
   }
- }
-'
+}'
