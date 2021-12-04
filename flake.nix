@@ -15,16 +15,6 @@
       sshRootKeys = [
         "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDLopgIL2JS/XtosC8K+qQ1ZwkOe1gFi8w2i1cd13UehWwkxeguU6r26VpcGn8gfh6lVbxf22Z9T2Le8loYAhxANaPghvAOqYQH/PJPRztdimhkj2h7SNjP1/cuwlQYuxr/zEy43j0kK0flieKWirzQwH4kNXWrscHgerHOMVuQtTJ4Ryq4GIIxSg17VVTA89tcywGCL+3Nk4URe5x92fb8T2ZEk8T9p1eSUL+E72m7W7vjExpx1PLHgfSUYIkSGBr8bSWf3O1PW6EuOgwBGidOME4Y7xNgWxSB/vgyHx3/3q5ThH0b8Gb3qsWdN22ZILRAeui2VhtdUZeuf2JYYh8L phaer-yubikey"
       ];
-
-      sshInitrdHostKey = ''
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACDYZao32W32dDPFFmJ2N5TIv0CHs3H43i8YgbXGYcBCswAAAJhxDCK/cQwi
-vwAAAAtzc2gtZWQyNTUxOQAAACDYZao32W32dDPFFmJ2N5TIv0CHs3H43i8YgbXGYcBCsw
-AAAEDROyjqG0s5Gh/nIovEI8P0qZwDgdmtBtdj6CBZld36bthlqjfZbfZ0M8UWYnY3lMi/
-QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
------END OPENSSH PRIVATE KEY-----
-     '';
     in
 
     {
@@ -98,8 +88,8 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
               # hostKeys paths must be unquoted strings, otherwise you'll run into issues
               # with boot.initrd.secrets the keys are copied to initrd from the path specified;
               # multiple keys can be set you can generate any number of host keys using
-              # `ssh-keygen -t ed25519 -N "" -f /boot-1/initrd-ssh-key`
-              hostKeys = [ (pkgs.writeText "ssh-initrd-host-key" sshInitrdHostKey) ];
+              # ssh-keygen -t ed25519 -N "" -f /persist/initrd-ssh-key
+              hostKeys = [ "/persist/initrd-ssh-key" ];
               # public ssh key used for login
               authorizedKeys = sshRootKeys;
             };
@@ -223,7 +213,14 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
 
               ${readRuntimeInfoScript} > runtime-info.json
 
+
               ${nukeDiskScript} "$(jq -r .diskToFormat runtime-info.json)"
+
+              # generate ssh-key.
+              # HACK: we link /persist in the kexec environment to /mnt/persist, because
+              the an absolute path outside the nix store is hardcoded in boot.initrd.network.ssh.hostKeys
+              ln -s /mnt/persist /persist
+              ssh-keygen -t ed25519 -N "" -f /persist/initrd-ssh-key
 
               # todo make flake template
               cat > flake.nix <<EOF
