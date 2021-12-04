@@ -8,11 +8,9 @@ HOST_NAME="$(hostname -f)"
 HOST_ID="$(hostname -f | sha256sum | cut -c 1-8)"
 
 # We use lsblk to find the disk of the currently mounted / file system, which in hclouds case is persistent.
-# this returns PKNAME, a path to the disk like "/dev/sda" and NAME, a path to the partition like "/dev/sda1"
-_ROOT_DEVICE_INFO="$(lsblk --list --paths --json --output MOUNTPOINT,PKNAME,NAME | jq '.blockdevices[] | select(.mountpoint=="/")')"
+# this returns PKNAME, a path to the disk like "/dev/sda"
+_ROOT_DEVICE_INFO="$(lsblk --list --paths --json --output MOUNTPOINT,PKNAME | jq '.blockdevices[] | select(.mountpoint=="/")')"
 _ROOT_DEVICE_DISK="$(echo "$_ROOT_DEVICE_INFO" | jq -r .pkname)"
-# TODO use to mount old root device in kexec-env if not possible per kernel cmdline
-#_ROOT_DEVICE_PARTITION="$(echo "$_ROOT_DEVICE_INFO" | jq .name)"
 
 # resolve _ROOT_DEVICE_DISK, e.g. /dev/sda to its /dev/disk/by-id path because thats more stable
 DISK_TO_FORMAT="$(find -L /dev/disk/by-id/ -samefile "$_ROOT_DEVICE_DISK")"
@@ -25,12 +23,12 @@ NETWORK_INTERFACE_MODULE="$(ethtool -i "$NETWORK_INTERFACE" | awk '/driver:/ {pr
 
 _IPV4_INFO="$(echo "$_IP_ADDR_INFO" | jq '.addr_info[] | select(.scope == "global" and .family == "inet")')"
 IPV4_ADDRESS="$(echo "$_IPV4_INFO" | jq -r '.local')"
-IPV4_PREFIX_LENGTH="$(echo "$_IPV4_INFO" | jq '.prefixlen')"
+IPV4_PREFIX_LENGTH="$(echo "$_IPV4_INFO" | jq -r '.prefixlen')"
 IPV4_GATEWAY="$(ip route | awk '/default via/ {print $3}')"
 
 _IPV6_INFO="$(echo "$_IP_ADDR_INFO" | jq '.addr_info[] | select(.scope == "global" and .family == "inet6")')"
 IPV6_ADDRESS="$(echo "$_IPV6_INFO" | jq -r '.local')"
-IPV6_PREFIX_LENGTH="$(echo "$_IPV6_INFO" | jq '.prefixlen')"
+IPV6_PREFIX_LENGTH="$(echo "$_IPV6_INFO" | jq -r '.prefixlen')"
 IPV6_GATEWAY="$(ip -6 route | awk '/default via/ {print $3}')"
 
 jq --null-input \
@@ -56,6 +54,7 @@ jq --null-input \
     "address": $ipv4Address,
     "prefixLength": $ipv4PrefixLength,
     "gateway": $ipv4Gateway,
+    "netmask": "255.255.255.255",  # TODO, dont hardcode
   },
   "ipv6": {
     "address": $ipv6Address,

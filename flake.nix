@@ -54,7 +54,6 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
         nix = { pkgs, lib, ... }: {
           nix = {
             nixPath = [ "nixpkgs=${nixpkgs}" ];
-            # Let 'nixos-version --json' know the Git revision of this flake.
             registry.nixpkgs.flake = nixpkgs;
             registry.installer.flake = self;
 
@@ -66,6 +65,8 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
             };
             optimise.automatic = true;
           };
+
+          nixpkgs.overlays = [ self.overlay ];
         };
 
 
@@ -155,11 +156,12 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
               # See <https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt> for docs on this
               # ip=<client-ip>:<server-ip>:<gw-ip>:<netmask>:<hostname>:<device>:<autoconf>:<dns0-ip>:<dns1-ip>:<ntp0-ip>
               # The server ip refers to the NFS server -- we don't need it.
-              "ip=${ipv4.address}::${ipv4.gateway}::${hostName}-initrd:${networkInterface}:off:8.8.8.8"
+              "ip=${ipv4.address}::${ipv4.gateway}:${netmask}:${hostName}-initrd:${networkInterface}:off:8.8.8.8"
             ];
 
             networking = with runtimeInfo; {
               hostName = hostName;
+              hostId = runtimeInfo.hostId;
               useDHCP = false;
               interfaces.${networkInterface} = {
                 useDHCP = false;
@@ -172,10 +174,25 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
             };
           };
 
+        core = { pkgs, lib, ... }: {
+          i18n.defaultLocale = "en_US.UTF-8";
+          time.timeZone = "UTC";
+          networking = {
+            firewall.allowedTCPPorts = [ 22 ];
+            usePredictableInterfaceNames = true;
+          };
+          environment.systemPackages = [
+            pkgs.gitMinimal  # de facto needed to work with flakes
+          ];
+
+        };
+
+
         installationEnvironment =
           { pkgs, lib, ... }:
           {
             imports = with self.nixosModules; [
+              core
               ssh
               nix
             ];
@@ -201,50 +218,51 @@ QIezcfjeLxiBtcZhwEKzAAAAE3Jvb3RAaW5zdGFsbGVyLXRlc3QBAg==
               (pkgs.writeScriptBin "install-flake" ''
               #!/usr/bin/env bash
               set -euxo pipefail
+              mkdir -p hostFlake
+              cd hostFlake
 
               ${readRuntimeInfoScript} > runtime-info.json
 
-              ${nukeDiskScript} "$( jq -r .diskToFormat runtime-info.json)"
+              ${nukeDiskScript} "$(jq -r .diskToFormat runtime-info.json)"
+
+              # todo make flake template
+              cat > flake.nix <<EOF
+              {
+                description = "A host-specific config, containing runtime info";
+                  inputs.installer.url = "${self.outPath}";
+                  outputs = { self, installer }:
+                  let runtimeInfo = builtins.fromJSON(builtins.readFile(./runtime-info.json));
+                  in { nixosConfigurations.install = installer.lib.makeSystem runtimeInfo; };
+              }
+              EOF
 
               TMPDIR=/tmp nixos-install \
               --no-channel-copy \
               --root /mnt \
               --no-root-passwd \
-              --flake ${self}#base
+              --flake .#install
 
               umount /mnt/{boot,nix,home,persist} /mnt
               #zpool export rpool
-              #reboot
+              reboot
 ''))
             ];
 
          };
       };
 
-      nixosConfigurations = {
-        base = nixpkgs.lib.nixosSystem {
-              inherit system;
-              modules = with self.nixosModules; [
-                ssh
-                zfs
-                hetzner
-                ({ pkgs, lib, ... }: {
-                  networking.hostId = hostId;
-                  nixpkgs.overlays = [ self.overlay ];
-                  i18n.defaultLocale = "en_US.UTF-8";
-                  time.timeZone = "UTC";
-                  networking = {
-                    firewall.allowedTCPPorts = [ 22 ];
-                    usePredictableInterfaceNames = true;
-                  };
+      lib.makeSystem = runtimeInfo:
+        nixpkgs.lib.nixosSystem {
+          inherit system;
+          extraArgs.runtimeInfo = runtimeInfo;
+          modules = with self.nixosModules; [
+            core
+            ssh
+            zfs
+            hetzner
+          ];
+        };
 
-                  environment.systemPackages = [
-                    pkgs.git  # needed for nix flakes
-                  ];
-                })
-              ];
-            };
-      };
 
       # # Tests run by 'nix flake check' and by Hydra.
       # checks = forAllSystems
