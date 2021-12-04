@@ -18,7 +18,10 @@ DISK_TO_FORMAT="$(find -L /dev/disk/by-id/ -samefile "$_ROOT_DEVICE_DISK")"
 # WARNING: This might not work with multiple network devices
 _IP_ADDR_INFO="$(ip --json addr show | jq '.[] | select(.link_type != "loopback") | .')"
 
-NETWORK_INTERFACE="$(echo "$_IP_ADDR_INFO" | jq -r .ifname)"
+# Hetzner clouds debian uses old style network interface names, we need to convert
+# e.g. eth0 -> enp0s3
+_NETWORK_INTERFACE_OLD_STYLE="$(echo "$_IP_ADDR_INFO" | jq -r .ifname)"
+NETWORK_INTERFACE="$(udevadm info --export --query=property --path="/sys/class/net/$_NETWORK_INTERFACE_OLD_STYLE" | awk "/^ID_NET_NAME_PATH/ {print gensub(/ID_NET_NAME_PATH='(.+)'/, \"\\\\1\", \"g\", \$0);}")";
 NETWORK_INTERFACE_MODULE="$(ethtool -i "$NETWORK_INTERFACE" | awk '/driver:/ {print $2}')"
 
 _IPV4_INFO="$(echo "$_IP_ADDR_INFO" | jq '.addr_info[] | select(.scope == "global" and .family == "inet")')"
