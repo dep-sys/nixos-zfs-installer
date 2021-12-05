@@ -10,6 +10,15 @@ The installer then formats the disks with [ZFS](https://openzfs.org/wiki/Main_Pa
 
 It's a [Nix Flake]() which uses [NixPkgs stable]()
 
+## TODOS
+- TODO: enp0s3  in debian vs ens3 (with altname enp0s3) in nixos
+- Decide how to handle ssh public keys.
+  Could add /root/.ssh/authorized_keys to runtime_info.json, but that might make it big for kernel cmdline.
+  Should be stored in /persist or nix store in final system
+- reduce size of kexec bundle
+- Store ssh host key for final system in /persist?
+- Port to nixos.party? Maybe once i find out wheter its open source and how it works
+
 ## ZFS setup
 
 ## Configuration
@@ -27,15 +36,7 @@ It's a [Nix Flake]() which uses [NixPkgs stable]()
 ## [x] Get the server to boot with kexec
 
 ``` sh
-nix build .#kexec
-hcloud server create --name installer-test --type cx21 --image debian-11 --location nbg1 --ssh-key "phaers yubikey"
-
-export TARGET_SERVER=$(hcloud server ip installer-test)
-rsync -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" -Lvz --info=progress2 result/* root@$TARGET_SERVER:
-# [ Uploading almost 1GB can take a while, but we end up with a pretty much fully functional environment]
-# "Boot" into the installation environment using kexec (this might take a few minutes)
-ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$TARGET_SERVER "apt update && DEBIAN_FRONTEND=noninteractive apt install -y kexec-tools && bash kexec-installer"
-
+bash recreate-test-vm.sh
 ```
 
 ### Debugging with grub
@@ -59,12 +60,7 @@ Make sure to replace the init hash from kexec-installer (or try to remove it, an
 ### Install NiXOS
 
 ``` sh
-# TODO interactive zpool key
-ssh -t -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$TARGET_SERVER install-flake
-ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$TARGET_SERVER reboot
 ```
-
-
 # References
 * [Github: Mic92s kexec-installer.nix](https://gist.github.com/Mic92/4fdf9a55131a7452f97003f445294f97)
 * [Github: Impermanence NixOS module](https://github.com/nix-community/impermanence)
