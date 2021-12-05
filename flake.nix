@@ -145,22 +145,26 @@
             boot.kernelParams = with runtimeInfo; [
               # See <https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt> for docs on this
               # ip=<client-ip>:<server-ip>:<gw-ip>:<netmask>:<hostname>:<device>:<autoconf>:<dns0-ip>:<dns1-ip>:<ntp0-ip>
-              # The server ip refers to the NFS server -- we don't need it.
-              "ip=${ipv4.address}::${ipv4.gateway}:${ipv4.netmask}:${hostName}-initrd:${networkInterface}:off:8.8.8.8"
+              "ip=dhcp"
             ];
-
+            # We mirror the default settings from a hcloud instance with debian-11 setup with cloud-init,
+            # dhcp autoconfiguration for ipv4, bugt a static one for the first ipv6 address in our subnet
             networking = with runtimeInfo; {
               hostName = hostName;
               hostId = runtimeInfo.hostId;
               useDHCP = false;
               interfaces.${networkInterface} = {
-                useDHCP = false;
-                ipv4 = { addresses = [{ address = ipv4.address; prefixLength = ipv4.prefixLength; }]; };
+                useDHCP = true;
                 ipv6 = { addresses = [{ address = ipv6.address; prefixLength = ipv6.prefixLength; }]; };
               };
-              defaultGateway = ipv4.gateway;
               defaultGateway6 = { address = ipv6.gateway; interface = networkInterface; };
-              nameservers = [ "8.8.8.8" ];
+              nameservers = [
+                # Hcloud nameservers
+                "185.12.64.1"
+                "185.12.64.2"
+                "2a01:4ff:ff00::add:1"
+                "2a01:4ff:ff00::add:2"
+              ];
             };
           };
 
