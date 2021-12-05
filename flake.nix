@@ -211,18 +211,22 @@
               in
               (pkgs.writeScriptBin "install-flake" ''
               #!/usr/bin/env bash
-              set -euxo pipefail
+              set -euo pipefail
               mkdir -p hostFlake
               cd hostFlake
 
               ${readRuntimeInfoScript} > runtime-info.json
 
+              echo "Installing with the following runtime data"
+              jq . runtime-info.json
+              echo "The disk will be NUKED and ALL DATA deleted. You will be asked for a disk encryption key next, the rest of the installation is non-interactive"
+              read -p "Press Enter delete ALL DATA" </dev/tty
 
               ${nukeDiskScript} "$(jq -r .diskToFormat runtime-info.json)"
 
               # generate ssh-key.
               # HACK: we link /persist in the kexec environment to /mnt/persist, because
-              the an absolute path outside the nix store is hardcoded in boot.initrd.network.ssh.hostKeys
+              # an absolute path outside the nix store is hardcoded in boot.initrd.network.ssh.hostKeys
               ln -s /mnt/persist /persist
               ssh-keygen -t ed25519 -N "" -f /persist/initrd-ssh-key
 
