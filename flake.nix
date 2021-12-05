@@ -11,12 +11,7 @@
 
       # Nixpkgs instantiated for supported system types.
       nixpkgsForSystem = import nixpkgs { inherit system; overlays = [ self.overlay ]; };
-
-      sshRootKeys = [
-        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDLopgIL2JS/XtosC8K+qQ1ZwkOe1gFi8w2i1cd13UehWwkxeguU6r26VpcGn8gfh6lVbxf22Z9T2Le8loYAhxANaPghvAOqYQH/PJPRztdimhkj2h7SNjP1/cuwlQYuxr/zEy43j0kK0flieKWirzQwH4kNXWrscHgerHOMVuQtTJ4Ryq4GIIxSg17VVTA89tcywGCL+3Nk4URe5x92fb8T2ZEk8T9p1eSUL+E72m7W7vjExpx1PLHgfSUYIkSGBr8bSWf3O1PW6EuOgwBGidOME4Y7xNgWxSB/vgyHx3/3q5ThH0b8Gb3qsWdN22ZILRAeui2VhtdUZeuf2JYYh8L phaer-yubikey"
-      ];
     in
-
     {
 
       # A Nixpkgs overlay.
@@ -60,8 +55,14 @@
         };
 
 
-        ssh = { pkgs, lib, ... }: {
-          users.users.root.openssh.authorizedKeys.keys = sshRootKeys;
+        ssh = { pkgs, lib, runtimeInfo ? false , ... }: {
+          # runtimeInfo is false during evaluation-time of the kexec environment.
+          # Over there, we rely on an systemd service to read the key from
+          # runtime_info kernel cmdline and write it to tmpfs.
+          users.users.root.openssh.authorizedKeys.keyFiles =
+            if runtimeInfo
+            then runtimeInfo.rootAuthorizedKeys
+            else ["/var/run/keys/root-authorized-keys"];
           services.openssh = {
             enable = true;
             passwordAuthentication = lib.mkForce false;
@@ -88,10 +89,13 @@
               # hostKeys paths must be unquoted strings, otherwise you'll run into issues
               # with boot.initrd.secrets the keys are copied to initrd from the path specified;
               # multiple keys can be set you can generate any number of host keys using
-              # ssh-keygen -t ed25519 -N "" -f /persist/initrd-ssh-key
-              hostKeys = [ "/persist/initrd-ssh-key" ];
+              # ssh-keygen -t ed25519 -N "" -f /persist/etc/ssh/initrd_ssh_host_ed25519_key
+              hostKeys = [ "/persist/etc/ssh/initrd_ssh_host_ed25519_key" ];
               # public ssh key used for login
-              authorizedKeys = sshRootKeys;
+              # TODO There's no authorizedKeyFiles for boot.initrd.network.ssh yet, and we cant
+              # just use ExtraConfig because NixOS (or us) would need to copy those paths to the initrd
+              # during rebuild
+              authorizedKeys = runtimeInfo.rootAuthorizedKeys;
             };
             # this will automatically load the zfs password prompt on login
             # and kill the other prompt so boot can continue
@@ -179,6 +183,8 @@
             pkgs.gitMinimal  # de facto needed to work with flakes
           ];
 
+          # TODO REMOVE, debug only
+          users.extraUsers.root.password = "testtest";
         };
 
 
@@ -195,7 +201,21 @@
               firewall.allowedTCPPorts = [ 22 ];
               usePredictableInterfaceNames = true;
               useDHCP = true;
-            };
+           };
+
+           systemd.services.writeAuthorizedKeys = {
+             wantedBy = [ "sshd.target" ];
+             description = "Read SSH authorized keys from kernel cmdline and write them for SSHD";
+             serviceConfig.Type = "oneshot";
+             script = ''
+             if [ ! -f /var/run/keys/root-authorized-keys ]; then
+               # Write authorized key for root user in final system
+               ${readRuntimeInfoScript} jq -r '.rootAuthorizedKeys[]' > /var/run/keys/root-authorized-keys
+               chown root:root /var/run/keys/root-authorized-keys
+               chmod 0600 /var/run/keys/root-authorized-keys
+             if
+             '';
+           };
 
            environment.systemPackages = [
              pkgs.jq
@@ -215,6 +235,7 @@
               mkdir -p hostFlake
               cd hostFlake
 
+
               ${readRuntimeInfoScript} > runtime-info.json
 
               echo "Installing with the following runtime data"
@@ -224,11 +245,19 @@
 
               ${nukeDiskScript} "$(jq -r .diskToFormat runtime-info.json)"
 
-              # generate ssh-key.
-              # HACK: we link /persist in the kexec environment to /mnt/persist, because
+              # we link /persist in the kexec environment to /mnt/persist, because
               # an absolute path outside the nix store is hardcoded in boot.initrd.network.ssh.hostKeys
               ln -s /mnt/persist /persist
-              ssh-keygen -t ed25519 -N "" -f /persist/initrd-ssh-key
+
+              # generate ssh host key for initrd.
+              mkdir -p /persist/etc/ssh
+              chown root:root /persist/etc/ssh
+              chmod 0700 /persist/etc/ssh
+
+              ssh-keygen -t ed25519 -N "" -f /persist/etc/ssh/initrd_ssh_host_ed25519_key
+              chown root:root /persist/etc/ssh/initrd_ssh_host_ed25519_key{,.pub}
+              chmod 0600 /persist/etc/ssh/initrd_ssh_host_ed25519_key
+              chmod 044 /persist/etc/ssh/initrd_ssh_host_ed25519_key.pub
 
               # todo make flake template
               cat > flake.nix <<EOF
@@ -248,7 +277,6 @@
               --flake .#install
 
               umount /mnt/{boot,nix,home,persist} /mnt
-              #zpool export rpool
               reboot
 ''))
             ];

@@ -7,6 +7,8 @@ HOST_NAME="$(hostname -f)"
 # a given filesystem pool belongs to the host.
 HOST_ID="$(hostname -f | sha256sum | cut -c 1-8)"
 
+ROOT_AUTHORIZED_KEYS="$(jq --raw-input --slurp 'split("\n") | map(select(. != ""))' /root/.ssh/authorized_keys)"
+
 # We use lsblk to find the disk of the currently mounted / file system, which in hclouds case is persistent.
 # this returns PKNAME, a path to the disk like "/dev/sda"
 _ROOT_DEVICE_INFO="$(lsblk --list --paths --json --output MOUNTPOINT,PKNAME | jq '.blockdevices[] | select(.mountpoint=="/")')"
@@ -19,10 +21,10 @@ DISK_TO_FORMAT="$(find -L /dev/disk/by-id/ -samefile "$_ROOT_DEVICE_DISK")"
 _IP_ADDR_INFO="$(ip --json addr show | jq '.[] | select(.link_type != "loopback") | .')"
 
 # Hetzner clouds debian uses old style network interface names, we need to convert
-# e.g. eth0 -> enp0s3
+# e.g. eth0 -> ens3
 _NETWORK_INTERFACE_OLD_STYLE="$(echo "$_IP_ADDR_INFO" | jq -r .ifname)"
-NETWORK_INTERFACE="$(udevadm info --export --query=property --path="/sys/class/net/$_NETWORK_INTERFACE_OLD_STYLE" | gawk "/^ID_NET_NAME_PATH/ {print gensub(/ID_NET_NAME_PATH='(.+)'/, \"\\\\1\", \"g\", \$0);}")";
-NETWORK_INTERFACE_MODULE="$(ethtool -i "$NETWORK_INTERFACE" | gawk '/driver:/ {print $2}')"
+NETWORK_INTERFACE="$(udevadm info --export --query=property --path="/sys/class/net/$_NETWORK_INTERFACE_OLD_STYLE" | gawk "/^ID_NET_NAME_SLOT/ {print gensub(/ID_NET_NAME_SLOT='(.+)'/, \"\\\\1\", \"g\", \$0);}")";
+NETWORK_INTERFACE_MODULE="$(ethtool -i "$_NETWORK_INTERFACE_OLD_STYLE" | gawk '/driver:/ {print $2}')"
 
 _IPV4_INFO="$(echo "$_IP_ADDR_INFO" | jq '.addr_info[] | select(.scope == "global" and .family == "inet")')"
 IPV4_ADDRESS="$(echo "$_IPV4_INFO" | jq -r '.local')"
@@ -38,6 +40,7 @@ IPV6_GATEWAY="$(ip -6 route | gawk '/default via/ {print $3}')"
 jq --null-input \
   --arg hostName "$HOST_NAME" \
   --arg hostId "$HOST_ID" \
+  --arg rootAuthorizedKeys "$ROOT_AUTHORIZED_KEYS" \
   --arg diskToFormat "$DISK_TO_FORMAT" \
   --arg networkInterface "$NETWORK_INTERFACE" \
   --arg networkInterfaceModule "$NETWORK_INTERFACE_MODULE" \
