@@ -36,16 +36,17 @@ cat > flake.nix <<EOF
       system = "x86_64-linux";
       pkgs = import installer.inputs.nixpkgs { inherit system; overlays = [ installer.outputs.overlay ]; };
       runtimeInfo = builtins.fromJSON(builtins.readFile(./runtime-info.json));
-      extraConfig = {
-        environment.systemPackages = [
-          pkgs.jq
-          pkgs.vim
-          pkgs.tmux
-          pkgs.rsync
-        ];
-
+      extraModule = {pkgs, lib, config, ...}: {
+        config = {
+          environment.systemPackages = [
+            pkgs.jq
+            pkgs.vim
+            pkgs.tmux
+            pkgs.rsync
+          ];
+        };
       };
-    in { nixosConfigurations.install = installer.lib.makeSystem extraConfig self runtimeInfo; };
+    in { nixosConfigurations.installed = installer.lib.makeSystem self extraModule runtimeInfo; };
 }
 EOF
 
@@ -53,7 +54,7 @@ TMPDIR=/tmp nixos-install \
     --no-channel-copy \
     --root /mnt \
     --no-root-passwd \
-    --flake .#install
+    --flake .#installed
 
 umount /mnt/{boot,nix,home,persist} /mnt
 reboot
