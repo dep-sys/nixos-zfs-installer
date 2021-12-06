@@ -11,12 +11,9 @@ The installer then formats the disks with [ZFS](https://openzfs.org/wiki/Main_Pa
 It's a [Nix Flake]() which uses [NixPkgs stable]()
 
 ## TODOS
-- TODO: enp0s3  in debian vs ens3 (with altname enp0s3) in nixos
-- Decide how to handle ssh public keys.
-  Could add /root/.ssh/authorized_keys to runtime_info.json, but that might make it big for kernel cmdline.
-  Should be stored in /persist or nix store in final system
 - reduce size of kexec bundle
-- Store ssh host key for final system in /persist?
+- Store ssh host key for final system in /persist
+- use impermanence & reset / on reboot
 - Port to nixos.party? Maybe once i find out wheter its open source and how it works
 
 ## ZFS setup

@@ -54,6 +54,7 @@ jq --null-input \
 '{
   "hostName": $hostName,
   "hostId": $hostId,
+  "rootAuthorizedKeys": $rootAuthorizedKeys,
   "diskToFormat": $diskToFormat,
   "networkInterface": $networkInterface,
   "networkInterfaceModule": $networkInterfaceModule,
