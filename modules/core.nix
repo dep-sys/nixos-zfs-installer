@@ -1,31 +1,36 @@
 { pkgs, lib, ... }: {
   options.runtimeInfo = with lib; mkOption {
     description = "Data gathered from hcloud host, disk, ips, interfaces, etc";
-    type = with types; nullOr (attrsOf (types.submodule {
-      options = {
-        hostName = mkOption { type = str; };
-        hostId = mkOption { type = str; };
-        rootAuthorizedKeys = mkOption { type = listOf str; };
-        diskToFormat = mkOption { type = str; };
-        networkInterface = mkOption { type = str; };
-        networkInterfaceModule = mkOption { type = str; };
-        ipv4 = attrsOf (types.submodule {
-          options = {
-            address = mkOption { type = str; };
-            prefixLength = mkOption { type = int; };
-            gateway = mkOption { type = str; };
-            netmask = mkOption { type = str; };
-          };
-        });
-        ipv6 = attrsOf (types.submodule {
-          options = {
-            address = mkOption { type = str; };
-            prefixLength = mkOption { type = int; };
-            gateway = mkOption { type = str; };
-          };
-        });
-      };
-    }));
+    type = types.anything;
+    #type = with types; nullOr (attrsOf (types.submodule {
+    #  options = {
+    #    hostName = mkOption { type = str; };
+    #    hostId = mkOption { type = str; };
+    #    rootAuthorizedKeys = mkOption { type = listOf str; };
+    #    diskToFormat = mkOption { type = str; };
+    #    networkInterface = mkOption { type = str; };
+    #    networkInterfaceModule = mkOption { type = str; };
+    #    ipv4 = mkOption {
+    #      type = attrsOf (types.submodule {
+    #        options = {
+    #          address = mkOption { type = str; };
+    #          prefixLength = mkOption { type = int; };
+    #          gateway = mkOption { type = str; };
+    #          netmask = mkOption { type = str; };
+    #        };
+    #      });
+    #    };
+    #    ipv6 = mkOption {
+    #      type = attrsOf (types.submodule {
+    #        options = {
+    #          address = mkOption { type = str; };
+    #          prefixLength = mkOption { type = int; };
+    #          gateway = mkOption { type = str; };
+    #        };
+    #      });
+    #    };
+    #  };
+    #}));
     default = null;
   };
 
