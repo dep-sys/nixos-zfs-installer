@@ -7,7 +7,6 @@
     boot.supportedFilesystems = [ "zfs" ];
     boot.zfs.requestEncryptionCredentials = true;
     boot.zfs.devNodes = "/dev/disk/by-partuuid";
-
     boot.initrd.network = {
       enable = true;
       ssh = {
@@ -40,6 +39,14 @@
               EOF
             '';
     };
+
+
+    # https://grahamc.com/blog/nixos-on-zfs
+    # "Note: If you do partition the disk, make sure you set the disk’s scheduler to none. ZFS takes this step automatically if it does control the entire disk.
+    # On NixOS, you an set your scheduler to none via:"
+    boot.kernelParams = [ "elevator=none" ];
+
+
 
     fileSystems."/" =
       { device = "rpool/local/root";
