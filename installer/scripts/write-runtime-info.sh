@@ -54,7 +54,7 @@ jq --null-input \
 '{
   "hostName": $hostName,
   "hostId": $hostId,
-  "rootAuthorizedKeys": $rootAuthorizedKeys,
+  "rootAuthorizedKeys": $rootAuthorizedKeys | fromjson,
   "diskToFormat": $diskToFormat,
   "networkInterface": $networkInterface,
   "networkInterfaceModule": $networkInterfaceModule,
