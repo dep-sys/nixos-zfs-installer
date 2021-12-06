@@ -76,15 +76,22 @@
                     useDHCP = true;
                   };
 
-                  systemd.services.writeAuthorizedKeys = {
+                  systemd.services.write-authorized-keys = {
+                    enable = true;
                     wants = [ "run-keys.mount" ];
-                    wantedBy = [ "sshd.target" ];
+                    wantedBy = [ "sshd.service" ];
                     description = "Read SSH authorized keys from kernel cmdline and write them for SSHD";
-                    serviceConfig.Type = "oneshot";
+                    serviceConfig = {
+                      Type = "oneshot";
+                      RemainAfterExit = "yes";
+                    };
                     script = ''
                     if [ ! -f /var/run/keys/root-authorized-keys ]; then
                       # Write authorized key for root user in final system
-                      ${readRuntimeInfoScript} | jq -r '.rootAuthorizedKeys[]' > /var/run/keys/root-authorized-keys
+                      PATH=${readRuntimeInfoScript}/bin:${pkgs.jq}/bin:${pkgs.gawk}/bin:$PATH
+                      read-runtime-info \
+                      | jq -r '.rootAuthorizedKeys[]' \
+                      > /var/run/keys/root-authorized-keys
                       chown root:root /var/run/keys/root-authorized-keys
                       chmod 0600 /var/run/keys/root-authorized-keys
                     fi
