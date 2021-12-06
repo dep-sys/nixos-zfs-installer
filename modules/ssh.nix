@@ -12,10 +12,10 @@
           permitRootLogin = lib.mkForce "without-password";
         };
       })
-      (lib.mkIf (config.runtimeInfo) {
+      (lib.mkIf (config.runtimeInfo != null) {
         users.users.root.openssh.authorizedKeys.keys = config.runtimeInfo.rootAuthorizedKeys;
       })
-      (lib.mkIf (!config.runtimeInfo) {
+      (lib.mkIf (config.runtimeInfo == null) {
         services.openssh.extraConfig = ''
             match User root
                 AuthorizedKeysFile /var/run/keys/root-authorized-keys
