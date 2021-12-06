@@ -108,7 +108,7 @@
           };
       };
 
-      lib.makeSystem = flake: runtimeInfo:
+      lib.makeSystem = extraConfig: flake: runtimeInfo:
         nixpkgs.lib.nixosSystem {
           inherit system;
           modules = with self.nixosModules; [
@@ -117,9 +117,15 @@
             nix
             zfs
             hetzner
-            ({ pkgs, lib, ... }: {
-              runtimeInfo = builtins.trace runtimeInfo runtimeInfo;
-              nix.registry.installed.flake = flake;
+            ({ pkgs, lib, ... }:
+            {
+              config = lib.mkMerge [
+                (builtins.trace extraConfig extraConfig)
+                {
+                  runtimeInfo = builtins.trace runtimeInfo runtimeInfo;
+                  nix.registry.installed.flake = flake;
+                }
+              ];
             })
           ];
         };

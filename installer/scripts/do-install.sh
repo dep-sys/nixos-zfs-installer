@@ -32,8 +32,20 @@ cat > flake.nix <<EOF
   description = "A host-specific config, containing runtime info";
     inputs.installer.url = "@flakePath@";
     outputs = { self, installer }:
-    let runtimeInfo = builtins.fromJSON(builtins.readFile(./runtime-info.json));
-    in { nixosConfigurations.install = installer.lib.makeSystem self runtimeInfo; };
+    let
+      system = "x86_64-linux";
+      pkgs = import installer.inputs.nixpkgs { inherit system; overlays = [ installer.outputs.overlay ]; };
+      runtimeInfo = builtins.fromJSON(builtins.readFile(./runtime-info.json));
+      extraConfig = {
+        environment.systemPackages = [
+          pkgs.jq
+          pkgs.vim
+          pkgs.tmux
+          pkgs.rsync
+        ];
+
+      };
+    in { nixosConfigurations.install = installer.lib.makeSystem extraConfig self runtimeInfo; };
 }
 EOF
 
