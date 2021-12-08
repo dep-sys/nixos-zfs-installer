@@ -10,33 +10,47 @@ The installer then formats the disks with [ZFS](https://openzfs.org/wiki/Main_Pa
 
 It's a [Nix Flake]() which uses [NixPkgs stable]()
 
+## Steps
+
+### Build the kexec-bundle
+
+``` shellsession
+# nix build .#kexec
+```
+
+This should build the following result:
+
+``` shellsession
+# ls -1 result/
+bzImage             # the kernel image to boot
+initrd.gz           # the initial ram disk to load
+run-installer       # installs utils, adds encoded runtime info to kernel parameters and "reboots" the system using kexec.
+write-runtime-info  # gather info like disk, ips, etc from hcloud host.
+```
+
+
+
 ## TODOS
 - reduce size of kexec bundle
 - Store ssh host key for final system in /persist
 - use impermanence & reset / on reboot
 - Port to nixos.party? Maybe once i find out wheter its open source and how it works
 
-## ZFS setup
 
-## Configuration
+# Notes
 
-## Terraform
+export HOST_FLAKE=$(jq -r '.flakes[] | select(.from.id == "installed") | .to.path' /etc/nix/registry.json)
+nixos-rebuild switch --flake $HOST_FLAKE#installed
 
-## Colmena 
+mkdir ~/hostFlake && cp -Rv $HOST_FLAKE/* ~/hostFlake && cd ~/hostFlake && git init || true  && git add . && nixos-rebuild switch --flake .#installed
 
+## DELETE and recreate a hcloud machine named "installer-test" and provision it.
 
-## Secrets 
- 
-
-# Roadmap
-
-## [x] Get the server to boot with kexec
-
-``` sh
+``` shellsession
 bash recreate-test-vm.sh
 ```
 
-### Debugging with grub
+### Debugging kexec with grub
 
 During development, it can be useful to boot the generated kernel and initrd manually via grub. I use hetzners web console
 to get to the bootloader, press `c` for a console and paste the following lines:

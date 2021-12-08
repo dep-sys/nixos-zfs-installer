@@ -16,4 +16,5 @@ export TARGET_SERVER=$(hcloud server ip installer-test)
 wait_for_ssh "$TARGET_SERVER"
 rsync -e "ssh $SSH_ARGS" -Lvz --info=progress2 result/* root@$TARGET_SERVER:
 ssh $SSH_ARGS root@$TARGET_SERVER "./run-installer"
-#ssh -t $SSH_ARGS root@$TARGET_SERVER do-install # -t for interactive questions
+wait_for_ssh "$TARGET_SERVER"
+ssh -t $SSH_ARGS root@$TARGET_SERVER do-install # -t for interactive questions
