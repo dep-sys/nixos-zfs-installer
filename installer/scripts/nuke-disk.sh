@@ -20,7 +20,10 @@ sgdisk -a1 -n1:0:0 -t1:BF01 "$DISK"
 # reload partition table
 partprobe
 
-#	-O keylocation="file://$KEYFILE" \
+# create tempfile for password
+KEYFILE=$(mktemp)
+read-disk-key > "$KEYFILE"
+
 zpool create \
 	-o ashift=12 \
 	-o altroot="/mnt" \
@@ -31,7 +34,11 @@ zpool create \
 	-O compression=on \
 	-O encryption=on \
 	-O keyformat=passphrase \
+	-O keylocation="file://$KEYFILE" \
 	rpool "$DISK-part1"
+
+shred -u "$KEYFILE"
+zfs set keylocation="prompt" rpool
 
 zfs create -p -o mountpoint=legacy rpool/local/root
 zfs snapshot rpool/local/root@blank

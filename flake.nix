@@ -61,6 +61,7 @@
             config =
               let
                 readRuntimeInfoScript = pkgs.writeScriptBin "read-runtime-info"  (builtins.readFile ./installer/scripts/read-runtime-info.sh);
+                readDiskKeyScript = pkgs.writeScriptBin "read-disk-key"  (builtins.readFile ./installer/scripts/read-disk-key.sh);
                 nukeDiskScript = pkgs.writeScriptBin "nuke-disk" (builtins.readFile ./installer/scripts/nuke-disk.sh);
                 doInstallScript =
                   pkgs.writeScriptBin "do-install"
@@ -101,6 +102,7 @@
                     pkgs.jq
                     pkgs.ethtool
                     readRuntimeInfoScript
+                    readDiskKeyScript
                     nukeDiskScript
                     doInstallScript
                   ];
