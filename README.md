@@ -17,7 +17,7 @@ It's a [Nix Flake](https://nixos.wiki/wiki/Flakes) which uses [NixOS 21.11](http
 
 ## Possible Improvements
 - reduce size of kexec bundle
-- make the host-specific flake, currently hardcoded in [do-install.sh](./instlaler/scripts/do-install.sh) a flake-template
+- make the host-specific flake, currently hardcoded in [do-install.sh](./installer/scripts/do-install.sh) a flake-template
 - ...and think about the best workflow to import runtime-info.json from a single host into a flake/repo describing a network of multiple hosts.
 - cleanup & commit terraform/terranix example
 - store ssh host key for final system in /persist
