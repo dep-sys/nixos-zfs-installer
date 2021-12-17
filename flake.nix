@@ -1,8 +1,10 @@
 {
   description = "An optionated nixos installer";
   inputs.nixpkgs.url = "nixpkgs/nixos-21.11";
+  inputs.colmena.url = "github:zhaofengli/colmena";
+  inputs.colmena.inputs.nixpkgs.follows = "nixpkgs";
 
-  outputs = { self, nixpkgs }@inputs:
+  outputs = { self, nixpkgs, colmena }@inputs:
     let
       # System types to support.
       system = "x86_64-linux";
@@ -22,7 +24,17 @@
         {
           inherit (nixpkgsForSystem) kexec;
         };
-     defaultPackage.${system} = self.packages.${system}.kexec;
+      defaultPackage.${system} = self.packages.${system}.kexec;
+
+      colmena = {
+        meta = {
+          nixpkgs = nixpkgsForSystem;
+        };
+
+        installer-test = self.lib.makeColmenaHost {
+          hostName = "installer-test";
+        };
+      };
 
       nixosModules = {
         core = import ./modules/core.nix;
@@ -110,25 +122,57 @@
           };
       };
 
-      lib.makeSystem = flake: extraModule: runtimeInfo:
-        nixpkgs.lib.nixosSystem {
-          inherit system;
-          modules = with self.nixosModules; [
-            core
-            ssh
-            nix
-            zfs
-            hetzner
-            ({ pkgs, lib, ... }:
+      apps.${system}.colmena = colmena.defaultApp.${system};
+
+      lib.loadHosts = dir:
+        with nixpkgs.lib;
+        pipe
+          (builtins.readDir dir)
+          [
+            (entry: filterAttrs (n: v: v == "regular") entry)
+            attrNames
+            (map (name:
+              nameValuePair
+                (strings.removeSuffix ".json" name)
+                (builtins.fromJSON (builtins.readFile (dir + "/${name}")))))
+            builtins.listToAttrs
+          ];
+
+      lib.gatherHostModules = { profiles ? [], runtimeInfo }:
+        with self.nixosModules; [
+          core
+          ssh
+          nix
+          zfs
+          hetzner
+          ({ pkgs, lib, ... }:
             {
               config =
                 {
                   runtimeInfo = builtins.trace runtimeInfo runtimeInfo;
-                  nix.registry.installed.flake = flake;
                 };
             })
-            extraModule
-          ];
+        ] ++ profiles;
+
+      lib.makeColmenaHost = { hostName, profiles ? [] }:
+        let
+          runtimeInfo = builtins.fromJSON (builtins.readFile ./hosts/${hostName}.json);
+        in {
+          imports = self.lib.gatherHostModules {
+            inherit runtimeInfo;
+            profiles = [
+              {
+                deployment.targetHost = runtimeInfo.ipv6.address;
+                deployment.tags = [ "hcloud" "env-test" ];
+              }
+            ] ++ profiles;
+          };
+        };
+
+      lib.makeNixosSystem = { profiles ? [], runtimeInfo }:
+        nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = self.lib.gatherHostModules { inherit profiles runtimeInfo; };
         };
     };
 }
