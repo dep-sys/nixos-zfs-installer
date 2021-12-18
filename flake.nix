@@ -26,14 +26,18 @@
         };
       defaultPackage.${system} = self.packages.${system}.kexec;
 
+
       colmena = {
         meta = {
           nixpkgs = nixpkgsForSystem;
         };
       }
-      // self.lib.makeColmenaHosts (host: {
-        imports = self.lib.gatherHostModules (self.lib.makeColmenaHost host);
-      });
+      // (let
+        colmenaLib = import ./colmena.nix { lib = nixpkgs.lib; };
+      in colmenaLib.makeColmenaHosts (host: {
+        imports = self.lib.gatherHostModules (colmenaLib.makeColmenaHost host);
+      }));
+      apps.${system}.colmena = colmena.defaultApp.${system};
 
       nixosModules = {
         core = import ./modules/core.nix;
@@ -121,77 +125,31 @@
           };
       };
 
-      apps.${system}.colmena = colmena.defaultApp.${system};
+      lib = {
 
-      lib.gatherHostModules = { runtimeInfo, profile }:
-        with self.nixosModules; [
-          core
-          ssh
-          nix
-          zfs
-          hetzner
-          ({ pkgs, lib, ... }:
-            {
-              config =
-                {
-                  runtimeInfo = runtimeInfo;
-                };
-            })
-          profile
-        ];
-
-      lib.attrsFromFiles = dir: suffix: callback:
-        with nixpkgs;
-        lib.pipe
-          (builtins.readDir dir)
-          [
-            (entry: lib.filterAttrs (n: v: v == "regular" && lib.hasSuffix suffix n) entry)
-            lib.attrNames
-            (map (name:
-              lib.nameValuePair
-                (lib.strings.removeSuffix suffix name)
-                (callback (dir + "/${name}"))))
-            builtins.listToAttrs
-          ];
-
-      lib.loadHostsJSON = self.lib.attrsFromFiles
-        ./hosts
-        ".json"
-        (filename: builtins.fromJSON (builtins.readFile filename));
-
-      lib.loadHostsNix = self.lib.attrsFromFiles
-        ./hosts
-        ".nix"
-        (filename: import filename);
-
-      lib.makeColmenaHost = { runtimeInfo, profile }:
-        {
-          inherit runtimeInfo;
-          profile.imports = [
-            {
-              deployment.targetHost = runtimeInfo.ipv6.address;
-              deployment.tags = [ "hcloud" "env-test" ];
-            }
+        gatherHostModules = { runtimeInfo, profile }:
+          with self.nixosModules; [
+            core
+            ssh
+            nix
+            zfs
+            hetzner
+            ({ pkgs, lib, ... }:
+              {
+                config =
+                  {
+                    runtimeInfo = runtimeInfo;
+                  };
+              })
             profile
           ];
-        };
 
-      lib.makeColmenaHosts = callback:
-        with nixpkgs;
-        let
-          profiles = self.lib.loadHostsNix;
-        in
-        lib.mapAttrs (host: runtimeInfo:
-          callback {
-            inherit runtimeInfo;
-            profile = (builtins.trace profiles (profiles.${host}));
-          }
-        ) self.lib.loadHostsJSON;
+        makeNixosSystem = { runtimeInfo, profile ? {} }:
+          nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = self.lib.gatherHostModules { inherit profile runtimeInfo; };
+          };
 
-      lib.makeNixosSystem = { runtimeInfo, profile ? {} }:
-        nixpkgs.lib.nixosSystem {
-          inherit system;
-          modules = self.lib.gatherHostModules { inherit profile runtimeInfo; };
-        };
+      };
     };
 }
