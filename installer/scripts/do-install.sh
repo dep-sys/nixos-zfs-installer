@@ -36,20 +36,14 @@ cat > flake.nix <<EOF
       system = "x86_64-linux";
       pkgs = import installer.inputs.nixpkgs { inherit system; overlays = [ installer.outputs.overlay ]; };
       runtimeInfo = builtins.fromJSON(builtins.readFile(./runtime-info.json));
-      profiles = [({pkgs, lib, config, ...}: {
+      profile = {pkgs, lib, config, ...}: {
         config = {
           nix.registry.installed.flake = self;
-          environment.systemPackages = [
-            pkgs.jq
-            pkgs.vim
-            pkgs.tmux
-            pkgs.rsync
-          ];
-        };
-      })];
+       };
+      };
     in {
       nixosConfigurations.installed = installer.lib.makeNixosSystem {
-        inherit profiles runtimeInfo;
+        inherit profile runtimeInfo;
       };
     };
 }
