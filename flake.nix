@@ -14,10 +14,53 @@
     {
 
       overlay = final: prev: {
-        kexec = prev.callPackage ./installer/installer.nix {
+        kexec = prev.callPackage ./installer/kexec.nix {
           inherit nixpkgs system;
-          inherit (self.nixosModules) installationEnvironment;
+          installerFlake = self;
         };
+      };
+
+      nixosModules = {
+        core = import ./modules/core.nix;
+        ssh = import ./modules/ssh.nix;
+        zfs = import ./modules/zfs.nix;
+        hetzner = import ./modules/hetzner.nix;
+        nix = import ./modules/nix.nix;
+      };
+
+
+      lib = {
+
+        gatherHostModules = { runtimeInfo, profile }:
+          with self.nixosModules; [
+            core
+            ssh
+            nix
+            zfs
+            hetzner
+            ({ pkgs, lib, ... }:
+              {
+                config =
+                  {
+                    nix = {
+                      registry.installer.flake = self;
+                      nixPath = [ "nixpkgs=${nixpkgs}" ];
+                      registry.nixpkgs.flake = nixpkgs;
+                    };
+                    nixpkgs.overlays = [ self.overlay ];
+
+                    runtimeInfo = runtimeInfo;
+                  };
+              })
+            profile
+          ];
+
+        makeNixosSystem = { runtimeInfo, profile ? {} }:
+          nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = self.lib.gatherHostModules { inherit profile runtimeInfo; };
+          };
+
       };
 
       packages.${system} =
@@ -39,117 +82,6 @@
       }));
       apps.${system}.colmena = colmena.defaultApp.${system};
 
-      nixosModules = {
-        core = import ./modules/core.nix;
-        ssh = import ./modules/ssh.nix;
-        zfs = import ./modules/zfs.nix;
-        hetzner = import ./modules/hetzner.nix;
-        nix = { pkgs, lib, ... }: {
-          config = {
-            nix = {
-              nixPath = [ "nixpkgs=${nixpkgs}" ];
-              registry.nixpkgs.flake = nixpkgs;
-              registry.installer.flake = self;
 
-              package = pkgs.nixUnstable;
-              extraOptions = "experimental-features = nix-command flakes";
-              gc = {
-                automatic = true;
-                options = "--delete-older-than 30d";
-              };
-              optimise.automatic = true;
-            };
-
-            nixpkgs.overlays = [ self.overlay ];
-          };
-        };
-
-        installationEnvironment =
-          { pkgs, lib, ... }:
-          {
-            imports = with self.nixosModules; [
-              core
-              ssh
-              nix
-            ];
-
-            config =
-              let
-                readRuntimeInfoScript = pkgs.writeScriptBin "read-runtime-info"  (builtins.readFile ./installer/scripts/read-runtime-info.sh);
-                readDiskKeyScript = pkgs.writeScriptBin "read-disk-key"  (builtins.readFile ./installer/scripts/read-disk-key.sh);
-                nukeDiskScript = pkgs.writeScriptBin "nuke-disk" (builtins.readFile ./installer/scripts/nuke-disk.sh);
-                doInstallScript =
-                  pkgs.writeScriptBin "do-install"
-                    (builtins.readFile (pkgs.substituteAll {
-                      src = ./installer/scripts/do-install.sh;
-                      flakePath = self.outPath;
-                    }));
-              in
-                {
-                  networking = {
-                    firewall.allowedTCPPorts = [ 22 ];
-                    usePredictableInterfaceNames = true;
-                    useDHCP = true;
-                  };
-
-                  systemd.services.write-authorized-keys = {
-                    enable = true;
-                    wants = [ "run-keys.mount" ];
-                    wantedBy = [ "sshd.service" ];
-                    description = "Read SSH authorized keys from kernel cmdline and write them for SSHD";
-                    serviceConfig = {
-                      Type = "oneshot";
-                      RemainAfterExit = "yes";
-                    };
-                    script = ''
-                    if [ ! -f /var/run/keys/root-authorized-keys ]; then
-                      # Write authorized key for root user in final system
-                      PATH=${readRuntimeInfoScript}/bin:${pkgs.jq}/bin:${pkgs.gawk}/bin:$PATH
-                      read-runtime-info \
-                      | jq -r '.rootAuthorizedKeys[]' \
-                      > /var/run/keys/root-authorized-keys
-                      chown root:root /var/run/keys/root-authorized-keys
-                      chmod 0600 /var/run/keys/root-authorized-keys
-                    fi
-                    '';
-                  };
-                  environment.systemPackages = [
-                    pkgs.jq
-                    pkgs.ethtool
-                    readRuntimeInfoScript
-                    readDiskKeyScript
-                    nukeDiskScript
-                    doInstallScript
-                  ];
-                };
-          };
-      };
-
-      lib = {
-
-        gatherHostModules = { runtimeInfo, profile }:
-          with self.nixosModules; [
-            core
-            ssh
-            nix
-            zfs
-            hetzner
-            ({ pkgs, lib, ... }:
-              {
-                config =
-                  {
-                    runtimeInfo = runtimeInfo;
-                  };
-              })
-            profile
-          ];
-
-        makeNixosSystem = { runtimeInfo, profile ? {} }:
-          nixpkgs.lib.nixosSystem {
-            inherit system;
-            modules = self.lib.gatherHostModules { inherit profile runtimeInfo; };
-          };
-
-      };
     };
 }

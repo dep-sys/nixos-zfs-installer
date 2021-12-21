@@ -1,11 +1,7 @@
 { pkgs, lib, ... }: {
   config = {
     nix = {
-      nixPath = [ "nixpkgs=${nixpkgs}" ];
-      registry.nixpkgs.flake = nixpkgs;
-      registry.installer.flake = self;
-
-      package = pkgs.nixUnstable;
+      package = pkgs.nix_2_4;
       extraOptions = "experimental-features = nix-command flakes";
       gc = {
         automatic = true;
@@ -13,7 +9,5 @@
       };
       optimise.automatic = true;
     };
-
-    nixpkgs.overlays = [ self.overlay ];
   };
 }
