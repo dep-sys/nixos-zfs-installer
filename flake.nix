@@ -29,7 +29,8 @@
       };
 
 
-      lib = {
+      lib =
+        (import ./colmena.nix { lib = nixpkgs.lib; }) // {
 
         gatherHostModules = { runtimeInfo, profile }:
           with self.nixosModules; [
@@ -75,10 +76,8 @@
           nixpkgs = nixpkgsForSystem;
         };
       }
-      // (let
-        colmenaLib = import ./colmena.nix { lib = nixpkgs.lib; };
-      in colmenaLib.makeColmenaHosts (host: {
-        imports = self.lib.gatherHostModules (colmenaLib.makeColmenaHost host);
+      // (self.lib.makeColmenaHosts (host: {
+        imports = self.lib.gatherHostModules (self.lib.makeColmenaHost host);
       }));
       apps.${system}.colmena = colmena.defaultApp.${system};
 
